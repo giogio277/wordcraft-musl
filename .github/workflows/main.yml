@@ -1,0 +1,37 @@
+name: WordCraft musl (Alpine)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout WordCraft
+        uses: actions/checkout@v4
+        with:
+          repository: storytold/wordcraft
+          path: src
+
+      - name: Build in Alpine container (native musl)
+        run: |
+          docker run --rm -v "$PWD/src:/work" -w /work alpine:3.22 sh -euxc '
+            apk add --no-cache rustup build-base pkgconf git \
+              fontconfig-dev freetype-dev wayland-dev libxkbcommon-dev \
+              libx11-dev libxcursor-dev libxi-dev libxrandr-dev gtk+3.0-dev
+            rustup-init -y --profile minimal --default-toolchain stable
+            . "$HOME/.cargo/env"
+            cargo build --release -p wordcraft -p wordcraft-cli
+          '
+
+      - name: Collect binaries
+        run: |
+          mkdir out
+          cp src/target/release/wordcraft src/target/release/wordcraft-cli out/
+          file out/wordcraft || true
+          tar -C out -czf wordcraft-musl-x86_64.tar.gz .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wordcraft-musl-x86_64
+          path: wordcraft-musl-x86_64.tar.gz
